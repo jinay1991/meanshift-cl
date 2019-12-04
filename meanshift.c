@@ -2,7 +2,16 @@
 /// @file
 ///
 
+// Compilation:
+//     - macOS: clang meanshift.c -framework OpenCL
+//     - Linux: gcc meanshift.c -lopencl
+//
+
+#if defined(__APPLE__) || defined(__MACOSX)
 #include <OpenCL/opencl.h>
+#else
+#include <CL/opencl.h>
+#endif
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
