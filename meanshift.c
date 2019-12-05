@@ -57,7 +57,7 @@ const char *KernelSource =
     "   __constant const float2* input_2,     // original_points                    \n"
     "   const size_t count,                                                         \n"
     "   const float bandwidth,                                                      \n"
-    "   __global float2* output)            // shifted_points                       \n"
+    "   __global float2* output)              // shifted_points                     \n"
     "{                                                                              \n"
     "    float base_weight = 1.0F / (bandwidth * sqrt(2.0F * 3.14F));               \n"
     "    float2 shift = {0.0F, 0.0F};                                               \n"
