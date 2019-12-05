@@ -1,5 +1,5 @@
 ///
-/// @file
+/// @file       meanshift.c
 ///
 
 // Compilation:
@@ -35,8 +35,8 @@
 const char *KernelSource_1 =
     "\n"
     "__kernel void algorithm(                                                       \n"
-    "   __global const float2* input_1,                                             \n"
-    "   __global const float2* input_2,                                             \n"
+    "   __constant const float2* input_1,                                           \n"
+    "   __constant const float2* input_2,                                           \n"
     "   const uint count,                                                           \n"
     "   const float bandwidth,                                                      \n"
     "   __global float2* output)                                                    \n"
@@ -53,8 +53,8 @@ const char *KernelSource_1 =
 const char *KernelSource =
     "\n"
     "__kernel void algorithm(                                                       \n"
-    "   __global const float2* input_1,     // points                               \n"
-    "   __global const float2* input_2,     // original_points                      \n"
+    "   __constant const float2* input_1,     // points                             \n"
+    "   __constant const float2* input_2,     // original_points                    \n"
     "   const size_t count,                                                         \n"
     "   const float bandwidth,                                                      \n"
     "   __global float2* output)            // shifted_points                       \n"
@@ -83,10 +83,10 @@ int main(int argc, char **argv)
 {
     int err;  // error code returned from api calls
 
-    cl_float2 data[DATA_SIZE];  // original data set given to device
-
+    cl_float2 data[DATA_SIZE];     // original data set given to device
     cl_float2 results[DATA_SIZE];  // results returned from device
-    unsigned int correct;          // number of correct results returned
+
+    unsigned int correct;  // number of correct results returned
 
     size_t global;  // global domain size for our calculation
     size_t local;   // local domain size for our calculation
@@ -113,12 +113,12 @@ int main(int argc, char **argv)
         results[i].s[1] = 0.0F;
     }
 
-    printf("Inputs: {\n");
-    for (i = 0; i < count; i++)
-    {
-        printf("%f %f\n", data[i].s[0], data[i].s[1]);
-    }
-    printf("}\n");
+    // printf("Inputs: {\n");
+    // for (i = 0; i < count; i++)
+    // {
+    //     printf("%f %f\n", data[i].s[0], data[i].s[1]);
+    // }
+    // printf("}\n");
 
     // Connect to a compute device
     //
@@ -126,16 +126,16 @@ int main(int argc, char **argv)
     err = clGetDeviceIDs(NULL, gpu ? CL_DEVICE_TYPE_GPU : CL_DEVICE_TYPE_CPU, 1, &device_id, NULL);
     if (err != CL_SUCCESS)
     {
-        printf("Error: Failed to create a device group!\n");
+        printf("Error: Failed to create a device group! %d\n", err);
         return EXIT_FAILURE;
     }
 
     // Create a compute context
     //
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
-    if (!context)
+    if (!context || err != CL_SUCCESS)
     {
-        printf("Error: Failed to create a compute context!\n");
+        printf("Error: Failed to create a compute context! %d\n", err);
         return EXIT_FAILURE;
     }
 
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
         size_t len;
         char buffer[2048];
 
-        printf("Error: Failed to build program executable!\n");
+        printf("Error: Failed to build program executable! %d\n", err);
         clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
         printf("%s\n", buffer);
         return EXIT_FAILURE;
@@ -176,7 +176,7 @@ int main(int argc, char **argv)
     kernel = clCreateKernel(program, "algorithm", &err);
     if (!kernel || err != CL_SUCCESS)
     {
-        printf("Error: Failed to create compute kernel!\n");
+        printf("Error: Failed to create compute kernel! %d\n", err);
         return EXIT_FAILURE;
     }
 
@@ -196,13 +196,13 @@ int main(int argc, char **argv)
     err = clEnqueueWriteBuffer(commands, input_1, CL_TRUE, 0, sizeof(cl_float2) * count, data, 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
-        printf("Error: Failed to write to source array!\n");
+        printf("Error: Failed to write to source array! %d\n", err);
         return EXIT_FAILURE;
     }
     err = clEnqueueWriteBuffer(commands, input_2, CL_TRUE, 0, sizeof(cl_float2) * count, data, 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
-        printf("Error: Failed to write to source array!\n");
+        printf("Error: Failed to write to source array! %d\n", err);
         return EXIT_FAILURE;
     }
 
@@ -234,9 +234,9 @@ int main(int argc, char **argv)
     //
     global = count;
     err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL);
-    if (err)
+    if (err != CL_SUCCESS)
     {
-        printf("Error: Failed to execute kernel!\n");
+        printf("Error: Failed to execute kernel! %d\n", err);
         return EXIT_FAILURE;
     }
 
@@ -264,12 +264,12 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("Results: {\n");
-    for (i = 0; i < count; i++)
-    {
-        printf("%f %f\n", results[i].s[0], results[i].s[1]);
-    }
-    printf("}\n");
+    // printf("Results: {\n");
+    // for (i = 0; i < count; i++)
+    // {
+    //     printf("%f %f\n", results[i].s[0], results[i].s[1]);
+    // }
+    // printf("}\n");
 
     // Print a brief summary detailing the results
     //
