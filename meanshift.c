@@ -102,12 +102,12 @@ int main(int argc, char **argv)
         results[i].s[1] = 0.0F;
     }
 
-    printf("Inputs: {\n");
-    for (i = 0; i < count; i++)
-    {
-        printf("%f %f\n", data[i].s[0], data[i].s[1]);
-    }
-    printf("}\n");
+    // printf("Inputs: {\n");
+    // for (i = 0; i < count; i++)
+    // {
+    //     printf("%f %f\n", data[i].s[0], data[i].s[1]);
+    // }
+    // printf("}\n");
 
     // Connect to a compute device
     //
@@ -221,9 +221,7 @@ int main(int argc, char **argv)
     // Execute the kernel over the entire range of our 1d input data set
     // using the maximum number of work group items for this device
     //
-    // local = ;
     global = count;
-    printf("Choosen dim: {global=%ld, local=%ld}\n", global, local);
     err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, &event);
     if (err != CL_SUCCESS)
     {
@@ -265,12 +263,12 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("Results: {\n");
-    for (i = 0; i < count; i++)
-    {
-        printf("%f %f\n", results[i].s[0], results[i].s[1]);
-    }
-    printf("}\n");
+    // printf("Results: {\n");
+    // for (i = 0; i < count; i++)
+    // {
+    //     printf("%f %f\n", results[i].s[0], results[i].s[1]);
+    // }
+    // printf("}\n");
 
     // Print a brief summary detailing the results
     //
