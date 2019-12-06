@@ -4,7 +4,7 @@
 
 // Compilation:
 //     - macOS: clang meanshift.c -framework OpenCL
-//     - Linux: gcc meanshift.c -lopencl
+//     - Linux: gcc meanshift.c -lopencl -Lpath/to/opencl
 //
 
 #if defined(__APPLE__) || defined(__MACOSX)
@@ -25,7 +25,7 @@
 
 // Use a static data size for simplicity
 //
-#define DATA_SIZE (512)  //(128 * 160)  //(1024)
+#define DATA_SIZE (512)
 #define BANDWIDTH (3.0F)
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -41,9 +41,8 @@ const char *KernelSource_1 =
     "   const float bandwidth,                                                      \n"
     "   __global float2* output)                                                    \n"
     "{                                                                              \n"
-    "    size_t i = get_global_id(0);                                               \n"
-    "    if (i < count)                                                             \n"
-    "       output[i] = input_1[i] * input_2[i];                                    \n"
+    "    int i = get_global_id(0);                                                  \n"
+    "    output[i] = input_1[i] + input_2[i];                                       \n"
     "}                                                                              \n"
     "\n";
 ////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +58,8 @@ const char *KernelSource =
     "   const float bandwidth,                                                      \n"
     "   __global float2* output)              // shifted_points                     \n"
     "{                                                                              \n"
-    "    float base_weight = 1.0F / (bandwidth * sqrt(2.0F * 3.14F));               \n"
+    "    float pi = 3.14F;                                                          \n"
+    "    float base_weight = 1.0F / (bandwidth * sqrt(2.0F * pi));                  \n"
     "    float2 shift = {0.0F, 0.0F};                                               \n"
     "    float scale = 0.0F;                                                        \n"
     "                                                                               \n"
@@ -96,6 +96,11 @@ int main(int argc, char **argv)
     cl_command_queue commands;  // compute command queue
     cl_program program;         // compute program
     cl_kernel kernel;           // compute kernel
+    cl_event event;             // compute profile event
+
+    cl_ulong time_start;  // compute command queue execution time start
+    cl_ulong time_end;    // compute command queue execution time end
+    double elapsed_time;  // time taken for compute
 
     cl_mem input_1, input_2;         // device memory used for the input array
     cl_mem output;                   // device memory used for the output array
@@ -109,16 +114,17 @@ int main(int argc, char **argv)
     {
         data[i].s[0] = (cl_float)(i);
         data[i].s[1] = (cl_float)(i);
+
         results[i].s[0] = 0.0F;
         results[i].s[1] = 0.0F;
     }
 
-    // printf("Inputs: {\n");
-    // for (i = 0; i < count; i++)
-    // {
-    //     printf("%f %f\n", data[i].s[0], data[i].s[1]);
-    // }
-    // printf("}\n");
+    printf("Inputs: {\n");
+    for (i = 0; i < count; i++)
+    {
+        printf("%f %f\n", data[i].s[0], data[i].s[1]);
+    }
+    printf("}\n");
 
     // Connect to a compute device
     //
@@ -141,7 +147,7 @@ int main(int argc, char **argv)
 
     // Create a command commands
     //
-    commands = clCreateCommandQueue(context, device_id, 0, &err);
+    commands = clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &err);
     if (!commands)
     {
         printf("Error: Failed to create a command commands!\n");
@@ -159,7 +165,7 @@ int main(int argc, char **argv)
 
     // Build the program executable
     //
-    err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+    err = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
     if (err != CL_SUCCESS)
     {
         size_t len;
@@ -232,13 +238,19 @@ int main(int argc, char **argv)
     // Execute the kernel over the entire range of our 1d input data set
     // using the maximum number of work group items for this device
     //
+    // local = ;
     global = count;
-    err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL);
+    printf("Choosen dim: {global=%ld, local=%ld}\n", global, local);
+    err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, &event);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to execute kernel! %d\n", err);
         return EXIT_FAILURE;
     }
+
+    // Wait for the event commands to get serviced before reading back results
+    //
+    clWaitForEvents(1, &event);
 
     // Wait for the command commands to get serviced before reading back results
     //
@@ -246,34 +258,40 @@ int main(int argc, char **argv)
 
     // Read back the results from the device to verify the output
     //
-    err = clEnqueueReadBuffer(commands, output, CL_TRUE, 0, sizeof(float) * count, results, 0, NULL, NULL);
+    err = clEnqueueReadBuffer(commands, output, CL_TRUE, 0, sizeof(cl_float2) * count, results, 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to read output array! %d\n", err);
         return EXIT_FAILURE;
     }
 
+    // Obtain profiling details
+    //
+    clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL);
+    clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
+    elapsed_time = (time_end - time_start) / 1000000.0;
+
     // Validate our results
     //
     correct = 0;
     for (i = 0; i < count; i++)
     {
-        if (results[i].s[0] != data[i].s[0] && results[i].s[1] != data[i].s[1])
+        if (results[i].s[0] != 0.0F && results[i].s[1] != 0.0F)
         {
             correct++;
         }
     }
 
-    // printf("Results: {\n");
-    // for (i = 0; i < count; i++)
-    // {
-    //     printf("%f %f\n", results[i].s[0], results[i].s[1]);
-    // }
-    // printf("}\n");
+    printf("Results: {\n");
+    for (i = 0; i < count; i++)
+    {
+        printf("%f %f\n", results[i].s[0], results[i].s[1]);
+    }
+    printf("}\n");
 
     // Print a brief summary detailing the results
     //
-    printf("Computed '%d/%zu' correct values!\n", correct, count);
+    printf("Computed '%d/%zu' correct values in [%0.3fms]!\n", correct, count, elapsed_time);
 
     // Shutdown and cleanup
     //
