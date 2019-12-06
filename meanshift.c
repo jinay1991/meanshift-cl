@@ -30,23 +30,6 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// Simple compute kernel which computes the square of an input array
-//
-const char *KernelSource_1 =
-    "\n"
-    "__kernel void algorithm(                                                       \n"
-    "   __constant const float2* input_1,                                           \n"
-    "   __constant const float2* input_2,                                           \n"
-    "   const uint count,                                                           \n"
-    "   const float bandwidth,                                                      \n"
-    "   __global float2* output)                                                    \n"
-    "{                                                                              \n"
-    "    int i = get_global_id(0);                                                  \n"
-    "    output[i] = input_1[i] + input_2[i];                                       \n"
-    "}                                                                              \n"
-    "\n";
-////////////////////////////////////////////////////////////////////////////////
-
 // Mean Shift Point kernel which computes the mean shift of points
 //
 const char *KernelSource =
